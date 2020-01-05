@@ -3,6 +3,12 @@ import keras_applications,keras_preprocessing
 import fasttext
 import pandas as pf  # reading csv files
 import string
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize, sent_tokenize
+
+# nltk.download('stopwords')
+# nltk.download('punkt')
 
 truthRating = {
     0: 'True',
@@ -13,28 +19,65 @@ truthRating = {
     5: 'Pants on Fire'
 }
 
+
+def remove_punctuation(data):
+
+    def remove(text):
+        blank_text = [c for c in text if c not in string.punctuation]
+        return blank_text
+
+    data['Statement'] = data['Statement'].apply(lambda x: remove(x))
+    return data
+
+
+def remove_capital_letters(data):
+    data['Statement'] = data['Statement'].apply(lambda x: x.lower())
+    return data
+
+
+def sentiment_tokenize(data):
+    data['Statement'] = data['Statement'].apply(lambda x: sent_tokenize(x))
+    return data
+
+
+def words_tokenize(data):
+    data['Statement'] = data['Statement'].apply(lambda x: word_tokenize(x))
+    return data
+
+
+# works on tokens
+def remove_stopwords(data):
+
+    def remove(text):
+        clean_list = [word for word in text if word not in set(stopwords.words('english'))]
+        return clean_list
+
+    data['Statement'] = data['Statement'].apply(lambda x: remove(x))
+    return data
+
+
+def prepare_data(data):
+
+    s1 = remove_capital_letters(data)
+    s2 = words_tokenize(s1)
+    s3 = remove_punctuation(s2)
+    s4 = remove_stopwords(s3)
+
+    return s4
+
+
 data = pf.read_csv('train.csv', sep='	')
-# data2 = pf.read_csv('test.csv', sep='	')
-# print(data.shape)
-# print(data2.shape)
+
+print(data.head())
+
+data = prepare_data(data)
+
+print(data.head())
+
+# print(data.head())
 # print(data['Statement'])
 
-print(data.head())
 
-
-# USUWA PRZECINKI
-
-# def remove_punctiation(text):
-#     blank_text = "".join([c for c in text if c not in string.punctuation])
-#     return blank_text
-#
-# data['Statement'] = data['Statement'].apply(lambda x: remove_punctiation(x))
-
-# WSZYSTKO Z MALYCH LITER
-
-# data['Statement'] = data['Statement'].apply(lambda x: x.lower())
-
-print(data.head())
 
 # 1. prepare data
 #  1.1 delete common words
