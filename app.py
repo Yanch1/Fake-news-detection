@@ -1,12 +1,10 @@
-import tensorflow as tf
-import keras_applications, keras_preprocessing
-import fasttext
 import pandas as pf  # reading csv files
-import string
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
 from sklearn.preprocessing import LabelEncoder
+from tensorflow import keras
+import numpy as np
 
 # nltk.download('stopwords')
 # nltk.download('punkt')
@@ -65,22 +63,27 @@ def preprocess_data(data, _regular_expressions=False, _remove_capitals=False, _r
     return data
 
 
-# import data
-data = pf.read_csv('train.csv', sep='	')
+def find_features(statement):
+    words = word_tokenize(statement)
+    features = []
+    for word in word_features:
+        features.append(word in words)
 
-# split data
-ratings = data['Rating']
-statements = data['Statement']
+    return np.array(features)
 
-# swap truth ratings to numbers
+#############################################################
+################# Load and preprocess data ##################
+#############################################################
+
+full_data = pf.read_csv('full.csv', sep='	', skiprows=[4021, 6315, 9380])
+ratings = full_data['Speaker']
+statements = full_data['Truth-Rating']
+
 encoder = LabelEncoder()
-Y = encoder.fit_transform(ratings)
+labels = encoder.fit_transform(ratings)
+statements = preprocess_data(statements, _regular_expressions=True, _remove_capitals=True,
+                                   _remove_punctuation=True, _remove_stopwords=True, _stemming=True)
 
-# preprocess data
-statements = preprocess_data(statements, _regular_expressions=True, _remove_capitals=True, _remove_punctuation=True,
-                             _remove_stopwords=True, _stemming=True)
-
-# create most used words dictionary
 all_words = []
 for statement in statements:
     words = word_tokenize(statement)
@@ -89,30 +92,57 @@ for statement in statements:
 
 
 all_words = nltk.FreqDist(all_words)
-# print(f'words nr after freqdist: {len(all_words)}')
-# print(f'most common: {all_words.most_common()}')
-
-word_features = list(all_words.keys())[:2000]
+most_common = all_words.most_common(2000)
 
 
-def find_features(statement):
-    words = word_tokenize(statement)
-    features = {}
-    for word in word_features:
-        features[word] = (word in words)
-
-    return features
+word_features = []
+for pair in most_common:
+    word_features.append(pair[0])
 
 
-feature = find_features(statements[0])
-for key, value in feature.items():
-    if value:
-        print(key)
+whole_set = []
+for statement in statements:
+    whole_set.append(find_features(statement))
 
 
+whole_set = np.array(whole_set)
 
-# print(data.head())
-#
-# data = preprocess_data(data)
-#
-# print(data.head())
+split_index = int(len(whole_set) * 0.8)
+
+split_list = np.array_split(whole_set, [split_index])
+training = split_list[0]
+testing = split_list[1]
+
+split_list = np.array_split(labels, [split_index])
+training_labels = split_list[0]
+testing_labels = split_list[1]
+
+######################################################
+################## Create model ######################
+######################################################
+model = keras.Sequential([
+    keras.layers.Flatten(input_shape=(2000,)),
+    keras.layers.Dense(400, activation="relu"),
+    keras.layers.Dense(6, activation="softmax")
+])
+
+# relu - 0.21 acc / 3.97 loss
+# elu - 0.20 acc / 2,69 loss
+# softmax - 0.23 acc / 1.73 loss
+# selu - 0.20 acc / 2.9 loss
+# softplus - 0.21 acc / 2.45 loss
+# softsign - 0.20 acc / 2.76 loss
+# tanh - 0.21 acc / 2.66 loss
+
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+model.fit(training, training_labels, epochs=10)
+
+######################################################
+################ Test model ##########################
+######################################################
+
+test_loss, test_acc = model.evaluate(testing, testing_labels)
+print(f"test acc = {test_acc}")
+print(f"test loss = {test_loss}")
