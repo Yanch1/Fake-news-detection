@@ -75,12 +75,24 @@ def find_features(statement):
 ################# Load and preprocess data ##################
 #############################################################
 
-full_data = pf.read_csv('full.csv', sep='	', skiprows=[4021, 6315, 9380])
-ratings = full_data['Speaker']
-statements = full_data['Truth-Rating']
+full_data = pf.read_csv('full.csv', sep='	', skiprows=[4021, 6315, 9380], index_col=False)
+
+full_data = full_data.sample(frac=1, random_state=13231)
+
+print(full_data)
+
+ratings = full_data['Truth-Rating']
+statements = full_data['Statement']
+speakers = full_data['Speaker']
 
 encoder = LabelEncoder()
 labels = encoder.fit_transform(ratings)
+speakers = encoder.fit_transform(speakers)
+
+speakers = np.array(speakers)
+speakers = np.true_divide(speakers, speakers.argmax())
+
+
 statements = preprocess_data(statements, _regular_expressions=True, _remove_capitals=True,
                                    _remove_punctuation=True, _remove_stopwords=True, _stemming=True)
 
@@ -92,7 +104,7 @@ for statement in statements:
 
 
 all_words = nltk.FreqDist(all_words)
-most_common = all_words.most_common(2000)
+most_common = all_words.most_common(1500)
 
 
 word_features = []
@@ -106,8 +118,10 @@ for statement in statements:
 
 
 whole_set = np.array(whole_set)
+whole_set = np.column_stack((whole_set, speakers))
+print(whole_set)
 
-split_index = int(len(whole_set) * 0.8)
+split_index = int(len(whole_set) * 0.9)
 
 split_list = np.array_split(whole_set, [split_index])
 training = split_list[0]
@@ -121,7 +135,7 @@ testing_labels = split_list[1]
 ################## Create model ######################
 ######################################################
 model = keras.Sequential([
-    keras.layers.Flatten(input_shape=(2000,)),
+    keras.layers.Flatten(input_shape=(1501,)),
     keras.layers.Dense(400, activation="relu"),
     keras.layers.Dense(6, activation="softmax")
 ])
@@ -137,7 +151,7 @@ model = keras.Sequential([
 
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-model.fit(training, training_labels, epochs=10)
+model.fit(training, training_labels, epochs=20)
 
 ######################################################
 ################ Test model ##########################
@@ -146,3 +160,6 @@ model.fit(training, training_labels, epochs=10)
 test_loss, test_acc = model.evaluate(testing, testing_labels)
 print(f"test acc = {test_acc}")
 print(f"test loss = {test_loss}")
+
+## test acc = 0.21595795452594757
+## test loss = 3.5621916977799915
