@@ -85,6 +85,17 @@ ratings = full_data['Truth-Rating']
 statements = full_data['Statement']
 speakers = full_data['Speaker']
 
+ratings = ratings.replace(0, 1)
+ratings = ratings.replace(2, 1)
+
+ratings = ratings.replace(5, 0)
+ratings = ratings.replace(4, 0)
+ratings = ratings.replace(3, 0)
+
+
+
+print(ratings.head(50))
+
 encoder = LabelEncoder()
 labels = encoder.fit_transform(ratings)
 speakers = encoder.fit_transform(speakers)
@@ -136,8 +147,8 @@ testing_labels = split_list[1]
 ######################################################
 model = keras.Sequential([
     keras.layers.Flatten(input_shape=(1501,)),
-    keras.layers.Dense(400, activation="relu"),
-    keras.layers.Dense(6, activation="softmax")
+    keras.layers.Dense(600, activation="softmax"),
+    keras.layers.Dense(2, activation="softmax")
 ])
 
 # relu - 0.21 acc / 3.97 loss
